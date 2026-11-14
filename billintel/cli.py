@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from .extraction import extract, inventory, local_models
 from .analytics import Scenario, analyze
+from .evaluation import evaluate
 
 def write_json(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -25,6 +26,10 @@ def main():
     p = commands.add_parser('analyze')
     p.add_argument('scenario', type=Path)
     p.add_argument('--output', type=Path, default=Path('output/analysis.json'))
+    p = commands.add_parser('evaluate')
+    p.add_argument('extraction', type=Path)
+    p.add_argument('labels', type=Path)
+    p.add_argument('--output', type=Path, default=Path('output/evaluation.json'))
     args = parser.parse_args()
     try:
         if args.command == 'models':
@@ -40,6 +45,11 @@ def main():
             print(f'Saved {target}; complete={result["complete"]}. Review values before use.')
             if any(p['status'] == 'error' for p in result['pages']):
                 return 1
+        elif args.command == 'evaluate':
+            result = evaluate(json.loads(args.extraction.read_text(encoding='utf-8-sig')),
+                              json.loads(args.labels.read_text(encoding='utf-8-sig')))
+            write_json(args.output, result)
+            print(f'Evaluated {result["evaluated_fields"]} fields; correct={result["correct_fields"]}')
         else:
             s = Scenario.model_validate_json(args.scenario.read_text(encoding='utf-8-sig'))
             write_json(args.output, analyze(s))

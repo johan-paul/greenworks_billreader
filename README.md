@@ -89,3 +89,22 @@ git push origin main
 - https://docs.ollama.com/capabilities/structured-outputs
 - https://docs.ollama.com/capabilities/vision
 - https://docs.ollama.com/faq
+
+## Evaluate against reviewed labels
+
+Create a local labels file with the source PDF SHA-256 and page-specific expected fields:
+
+```json
+{"sha256":"HASH_FROM_EXTRACTION", "pages":[{"page":1,"fields":{
+  "total_consumption":{"value":125,"unit":"kWh"},
+  "solar_energy":null
+}}]}
+```
+
+```powershell
+python -m billintel.cli evaluate 'output/extractions/result.json' 'output/labels.json'
+```
+
+Only label fields that can be established from that page. Numeric comparisons require matching units and use an absolute tolerance of 0.01. Missing/error pages count as failures. Keep labels and evaluation reports in `output/` to avoid committing private data.
+
+Initial smoke test: the installed `llama3.1:8b` returned valid JSON on one grid-bill page but matched only 4 of 8 manually checked fields, including errors in consumption and payable amount. This tiny sample is not a dataset accuracy estimate. Do not use its output for unattended reporting. Field-specific units and quote checks expose some failures; they cannot guarantee semantic correctness. Scanned-page validation is a separate requirement.

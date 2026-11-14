@@ -37,6 +37,7 @@ def test_kvah_and_missing_evidence_are_flagged():
     issues = review_issues(PageExtraction(**data), 'Actual page text')
     assert any('kVAh' in issue for issue in issues)
     assert any('quote not found' in issue for issue in issues)
+    assert any('number is absent' in issue for issue in issues)
 
 def test_scan_without_vision_is_explicit_error(tmp_path, monkeypatch):
     monkeypatch.setattr('billintel.extraction.check_model', lambda *a, **k: None)
@@ -49,3 +50,47 @@ def test_scan_without_vision_is_explicit_error(tmp_path, monkeypatch):
     assert result['complete'] is False
     assert result['pages'][0]['status'] == 'error'
     assert 'vision-model' in result['pages'][0]['error']
+
+def test_currency_cannot_be_consumption():
+    data = {name:None for name in PageExtraction.model_fields}
+    data.update(document_type='grid', notes=[], total_consumption={'value':100, 'unit':'INR','quote':'100'})
+    with pytest.raises(ValidationError):
+        PageExtraction(**data)
+
+def test_extraction_provenance_and_partial_run(tmp_path, monkeypatch):
+    monkeypatch.setattr('billintel.extraction.check_model', lambda *a, **k: None)
+    data = {name:None for name in PageExtraction.model_fields}
+    data.update(document_type='grid', notes=[], total_consumption={'value':125,'unit':'kWh','quote':'Consumption 125 kWh'})
+    captured = []
+    def fake_api(endpoint, payload):
+        captured.append(payload)
+        return {'message': {'content':json.dumps(data)}}
+    monkeypatch.setattr('billintel.extraction.api', fake_api)
+    path = tmp_path/'bill.pdf'
+    with pymupdf.open() as doc:
+        for _ in range(2):
+            page = doc.new_page()
+            page.insert_text((40,40), 'Consumption 125 kWh. ' + 'Printed electricity bill information. '*4)
+        doc.save(path)
+    _, result = extract(path, tmp_path/'out', 'test', max_pages=1)
+    assert result['processed_pages'] == 1
+    assert result['page_count'] == 2
+    assert result['complete'] is False
+    assert result['pages'][0]['page'] == 1
+    assert result['pages'][0]['data']['total_consumption']['value'] == 125
+    assert len(result['sha256']) == 64
+    assert captured[0]['stream'] is False
+    assert captured[0]['options']['temperature'] == 0
+
+def test_evaluation_counts_missing_pages_as_failures():
+    from billintel.evaluation import evaluate
+    report = evaluate({'sha256':'abc','pages':[]}, {'sha256':'abc','pages':[{'page':1,'fields':{'solar_energy':None}}]})
+    assert report['field_accuracy'] == 0
+    with pytest.raises(ValueError):
+        evaluate({'sha256':'abc'}, {'sha256':'different'})
+
+def test_evaluation_requires_units():
+    from billintel.evaluation import evaluate
+    extraction = {'sha256':'abc','pages':[{'page':1,'status':'needs_review','data':{'total_consumption':{'value':100,'unit':'kVAh'}}}]}
+    labels = {'sha256':'abc','pages':[{'page':1,'fields':{'total_consumption':{'value':100,'unit':'kWh'}}}]}
+    assert evaluate(extraction, labels)['correct_fields'] == 0

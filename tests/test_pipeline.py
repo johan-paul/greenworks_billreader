@@ -94,3 +94,19 @@ def test_evaluation_requires_units():
     extraction = {'sha256':'abc','pages':[{'page':1,'status':'needs_review','data':{'total_consumption':{'value':100,'unit':'kVAh'}}}]}
     labels = {'sha256':'abc','pages':[{'page':1,'fields':{'total_consumption':{'value':100,'unit':'kWh'}}}]}
     assert evaluate(extraction, labels)['correct_fields'] == 0
+
+def test_local_ocr_route(tmp_path, monkeypatch):
+    monkeypatch.setattr('billintel.extraction.check_model', lambda *a, **k: None)
+    monkeypatch.setattr('billintel.extraction.ocr_page', lambda page:'Solar energy 150 kWh supplied during April 2026. Invoice total INR 900.')
+    data = {name:None for name in PageExtraction.model_fields}
+    data.update(document_type='solar',notes=[],solar_energy={'value':150,'unit':'kWh','quote':'Solar energy 150 kWh'})
+    monkeypatch.setattr('billintel.extraction.api', lambda *a, **k:{'message':{'content':json.dumps(data)}})
+    path = tmp_path/'scan.pdf'
+    with pymupdf.open() as doc:
+        doc.new_page()
+        doc.save(path)
+    _, result = extract(path,tmp_path/'out','test',ocr=True)
+    assert result['complete'] is True
+    assert result['pages'][0]['method'] == 'ocr'
+    assert result['pages'][0]['data']['solar_energy']['value'] == 150
+    assert any('OCR text' in issue for issue in result['pages'][0]['issues'])

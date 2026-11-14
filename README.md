@@ -6,7 +6,7 @@ Offline electricity-bill extraction with Ollama and transparent energy analysis.
 
 - Inventories PDF datasets without sending them to a cloud service.
 - Extracts grid, solar and wind bill fields into validated JSON with page numbers and supporting quotes.
-- Reads embedded PDF text with a local language model; optionally renders scans for a local vision model.
+- Reads embedded PDF text with a local language model; supports local Tesseract OCR or a local vision model for scans.
 - Separates kWh, kVAh, kW and kVA and flags suspicious units and missing text evidence.
 - Calculates renewable share, scenario savings and avoided emissions from reviewed, reconciled inputs.
 - Saves progress after each page and records failures instead of silently skipping them.
@@ -21,9 +21,11 @@ Python 3.11+ and Ollama are required. Dependency installation and model download
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -e '.[dev]'
 ollama pull llama3.1:8b
-# For scans, download a compatible local vision model, for example:
+# Optional alternative to local Tesseract OCR: download a vision model:
 ollama pull qwen2.5vl:3b
 ```
+
+For `--ocr`, install Tesseract with English language data and put it on PATH (the standard Windows `C:/Program Files/Tesseract-OCR` location is also detected). Tesseract is already available on the development machine. OCR images are temporary and removed after recognition. OCR errors still require visual review.
 
 Run Ollama locally. For an offline deployment, disable Ollama cloud features with `OLLAMA_NO_CLOUD=1` in the server environment and restart Ollama; use network isolation if offline operation must be enforced beyond this application. The application hardcodes `127.0.0.1`, bypasses HTTP proxies and rejects model metadata indicating a cloud model. It makes no runtime model downloads.
 
@@ -31,6 +33,7 @@ Run Ollama locally. For an offline deployment, disable Ollama cloud features wit
 .\.venv\Scripts\python -m billintel.cli models
 .\.venv\Scripts\python -m billintel.cli inventory 'EB bills'
 .\.venv\Scripts\python -m billintel.cli extract 'path\to\bill.pdf' --max-pages 1
+.\.venv\Scripts\python -m billintel.cli extract 'path\to\scanned-bill.pdf' --ocr
 .\.venv\Scripts\python -m billintel.cli extract 'path\to\scanned-bill.pdf' --vision-model qwen2.5vl:3b
 # Use vision for complex tables even if the PDF has a text layer:
 .\.venv\Scripts\python -m billintel.cli extract 'path\to\bill.pdf' --vision-model qwen2.5vl:3b --force-vision
@@ -108,3 +111,7 @@ python -m billintel.cli evaluate 'output/extractions/result.json' 'output/labels
 Only label fields that can be established from that page. Numeric comparisons require matching units and use an absolute tolerance of 0.01. Missing/error pages count as failures. Keep labels and evaluation reports in `output/` to avoid committing private data.
 
 Initial smoke test: the installed `llama3.1:8b` returned valid JSON on one grid-bill page but matched only 4 of 8 manually checked fields, including errors in consumption and payable amount. This tiny sample is not a dataset accuracy estimate. Do not use its output for unattended reporting. Field-specific units and quote checks expose some failures; they cannot guarantee semantic correctness. Scanned-page validation is a separate requirement.
+
+### Local scan support
+
+The Tesseract + `llama3.1:8b` path was exercised on a scanned solar invoice. OCR recovered readable invoice text, but model extraction confused an HSN classification number with energy usage and misread monetary values. Numeric-evidence checks flagged these errors. This confirms the offline processing route works, not that extraction is accurate. Use reviewed inputs for analysis. A larger vision-model download was stopped after confirming an installed OCR route; a vision model is not installed or validated by this setup.

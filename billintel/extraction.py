@@ -2,6 +2,10 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import shutil
+import subprocess
+import tempfile
+import os
 from pathlib import Path
 from urllib.request import Request, ProxyHandler, build_opener
 import pymupdf
@@ -53,8 +57,23 @@ def inventory(folder: Path):
         result.append(row)
     return result
 
+def ocr_page(page):
+    executable = shutil.which('tesseract')
+    if not executable:
+        candidate = Path(os.environ.get('ProgramFiles', 'C:/Program Files')) / 'Tesseract-OCR/tesseract.exe'
+        executable = str(candidate) if candidate.is_file() else None
+    if not executable:
+        raise ValueError('Local Tesseract OCR is not installed; use --vision-model instead')
+    with tempfile.TemporaryDirectory(prefix='billintel-') as folder:
+        image = Path(folder) / 'page.png'
+        page.get_pixmap(dpi=220).save(image)
+        result = subprocess.run([executable, str(image), 'stdout', '-l', 'eng', '--psm', '3'],
+            capture_output=True, text=True, encoding='utf-8', timeout=120, check=True,
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        return result.stdout.strip()
+
 def extract(path: Path, output: Path, model: str, vision_model: str | None = None,
-            max_pages: int | None = None, force_vision: bool = False):
+            max_pages: int | None = None, force_vision: bool = False, ocr: bool = False):
     if max_pages is not None and max_pages < 1:
         raise ValueError('max-pages must be positive')
     check_model(model)
@@ -71,10 +90,16 @@ def extract(path: Path, output: Path, model: str, vision_model: str | None = Non
         for index in range(min(len(doc), max_pages or len(doc))):
             page = doc[index]
             text = page.get_text(sort=True).strip()
-            vision = force_vision or len(text) < 80
+            scanned = len(text) < 80
+            use_ocr = scanned and ocr and not force_vision
+            vision = force_vision or (scanned and not use_ocr)
             chosen = vision_model if vision else model
-            row = {'page': index + 1, 'method': 'vision' if vision else 'text', 'model': chosen}
+            row = {'page': index + 1, 'method': 'ocr' if use_ocr else ('vision' if vision else 'text'), 'model': chosen}
             try:
+                if use_ocr:
+                    text = ocr_page(page)
+                    if len(text) < 40:
+                        raise ValueError('OCR found insufficient readable text')
                 if not chosen:
                     raise ValueError('Scanned page requires --vision-model with a downloaded vision model')
                 if not vision and len(text) > 22000:
@@ -91,6 +116,8 @@ def extract(path: Path, output: Path, model: str, vision_model: str | None = Non
                 data = PageExtraction.model_validate_json(response['message']['content'])
                 row.update(status='needs_review', data=data.model_dump(),
                            issues=review_issues(data, None if vision else text))
+                if use_ocr:
+                    row['issues'].append('OCR text may contain recognition errors; compare against the original page.')
             except Exception as exc:
                 row.update(status='error', error=str(exc))
             result['pages'].append(row)

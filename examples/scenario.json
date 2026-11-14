@@ -1,0 +1,16 @@
+{
+  "site": "SYNTHETIC demonstration factory",
+  "period": "2026-04",
+  "assumptions_source": "Synthetic teaching example; rates and emission factors are illustrative, not official.",
+  "reviewed": true,
+  "grid_import_kwh": 60000,
+  "solar_used_kwh": 30000,
+  "wind_used_kwh": 10000,
+  "avoided_grid_rate_inr_per_kwh": 8,
+  "renewable_cost_inr": 240000,
+  "export_credit_inr": 0,
+  "grid_emission_kg_per_kwh": 0.7,
+  "renewable_emission_kg_per_kwh": 0.05,
+  "power_factor": 0.91,
+  "penalties_inr": 2500
+}

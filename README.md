@@ -2,6 +2,12 @@
 
 Offline electricity-bill extraction with Ollama and transparent energy analysis.
 
+## Upload dashboard
+
+Double-click `START_DASHBOARD.cmd`, then open **http://127.0.0.1:8791**. Upload a PDF, choose processing mode/pages and click **Analyze bill**. Inspect page-level values beside the original bill, download HTML/CSV/JSON reports, and use the separate Savings & impact calculator with reviewed inputs. See [dashboard instructions](docs/DASHBOARD.md).
+
+The dashboard is local-only. It accepts PDFs up to 30 MB / 100 pages, uses local OCR for scans, and falls back to Ollama for unfamiliar layouts in Automatic mode. Accuracy still depends on bill format and review; unsupported pages and partial runs are explicit.
+
 ## Review demo - 17 November 2026
 
 Double-click `RUN_REVIEW_DEMO.cmd` or run `python -m scripts.prepare_review`, then open `output/review/review-demo.html`. The report embeds selected original pages beside parsed fields and evidence, and includes a clearly synthetic savings/emissions example. It is private and ignored by Git. Read [the review guide](docs/REVIEW_GUIDE.md) and [validation record](docs/VALIDATION.md) for the opening script, architecture, questions and demo steps.

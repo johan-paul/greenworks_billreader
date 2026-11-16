@@ -12,6 +12,10 @@ Read this once tonight, then rehearse the opening and demo aloud. You do not nee
 >
 > I can demonstrate consumption extraction, scanned solar supply calculations and payable amounts with source evidence. Savings and emissions are calculated with deterministic formulas after reconciliation, rather than asking the language model to invent them. The next priority is a representative labeled evaluation set and monthly reconciliation across grid and renewable invoices.
 
+## Live upload dashboard
+
+For the interactive review, launch `START_DASHBOARD.cmd` and follow [the dashboard walkthrough](DASHBOARD.md). You can upload a PDF and generate a report. The static report below remains a fallback.
+
 ## Five-minute demonstration
 
 1. Double-click `RUN_REVIEW_DEMO.cmd` from the project folder. It rebuilds the local report using rules and OCR. It does not need Ollama or internet. If Python is not found, use the exact Python executable documented below.

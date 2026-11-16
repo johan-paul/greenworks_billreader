@@ -19,6 +19,7 @@ def main():
     p = commands.add_parser('extract')
     p.add_argument('pdf', type=Path)
     p.add_argument('--model', default='llama3.1:8b')
+    p.add_argument('--engine', choices=['llm','rules','hybrid'], default='hybrid')
     p.add_argument('--vision-model')
     p.add_argument('--force-vision', action='store_true')
     p.add_argument('--ocr', action='store_true', help='Use local Tesseract for scanned pages')
@@ -42,7 +43,7 @@ def main():
             write_json(args.output, rows)
             print(f'{len(rows)} PDFs; {sum(r.get("pages", 0) for r in rows)} pages. Saved {args.output}')
         elif args.command == 'extract':
-            target, result = extract(args.pdf, args.output, args.model, args.vision_model, args.max_pages, args.force_vision, args.ocr)
+            target, result = extract(args.pdf, args.output, args.model, args.vision_model, args.max_pages, args.force_vision, args.ocr, args.engine)
             print(f'Saved {target}; complete={result["complete"]}. Review values before use.')
             if any(p['status'] == 'error' for p in result['pages']):
                 return 1

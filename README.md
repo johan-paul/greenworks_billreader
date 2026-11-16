@@ -2,6 +2,20 @@
 
 Offline electricity-bill extraction with Ollama and transparent energy analysis.
 
+## Review demo - 17 November 2026
+
+Double-click `RUN_REVIEW_DEMO.cmd` or run `python -m scripts.prepare_review`, then open `output/review/review-demo.html`. The report embeds selected original pages beside parsed fields and evidence, and includes a clearly synthetic savings/emissions example. It is private and ignored by Git. Read [the review guide](docs/REVIEW_GUIDE.md) and [validation record](docs/VALIDATION.md) for the opening script, architecture, questions and demo steps.
+
+Current extraction engines:
+- `--engine hybrid` (CLI default): use known-layout rules; use local Ollama for unrecognized layouts.
+- `--engine rules`: no model required; unsupported layouts fail explicitly.
+- `--engine llm`: model-only baseline for comparison.
+
+Known rules cover MSEDCL headers/consumption tables, TANGEDCO headers and a solar-supply invoice pattern. Solar line totals are calculated separately from printed fields after line arithmetic checks; they are not assumed to equal delivered self-consumption. Unmatched fields remain null. Text/OCR model numeric candidates lacking supporting quotes or numbers are quarantined in `rejected_candidates`.
+
+A text-only scan recognized patterns on 199 of 595 pages, with 280 unmatched text pages and 116 OCR/blank-review pages. Pattern recognition is not complete extraction or accuracy. The revised rules matched 8/8 checked fields on the original development page; the previous model-only result was 4/8. This is not held-out evaluation. The broader dataset and vision-model route still need validation.
+
+
 ## What this version does
 
 - Inventories PDF datasets without sending them to a cloud service.

@@ -63,6 +63,10 @@ def review_issues(data: PageExtraction, text: str | None) -> list[str]:
         numbers = [float(n.replace(',', '')) for n in re.findall(r'-?\d[\d,]*(?:\.\d+)?', item.quote)]
         if not any(math.isclose(item.value, n, rel_tol=1e-9, abs_tol=1e-6) for n in numbers):
             issues.append(f'{name}: reported number is absent from supporting quote')
+        source_labels = {'grid_import': r'\b(grid|import)\b', 'solar_energy': r'\bsolar\b',
+                         'wind_energy': r'\bwind\b', 'export_energy': r'\bexport\b'}
+        if name in source_labels and not re.search(source_labels[name], item.quote, re.I):
+            issues.append(f'{name}: source label is absent from supporting quote')
         if name in ENERGY_FIELDS and (item.value < 0 or item.unit != 'kWh'):
             issues.append(f'{name}: expected nonnegative kWh; do not convert kVAh without verified power factor')
         if name == 'power_factor' and (item.unit != 'ratio' or not 0 < item.value <= 1):

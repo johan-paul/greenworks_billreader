@@ -110,3 +110,37 @@ def test_local_ocr_route(tmp_path, monkeypatch):
     assert result['pages'][0]['method'] == 'ocr'
     assert result['pages'][0]['data']['solar_energy']['value'] == 150
     assert any('OCR text' in issue for issue in result['pages'][0]['issues'])
+
+def test_llm_unsupported_number_is_quarantined(tmp_path, monkeypatch):
+    monkeypatch.setattr('billintel.extraction.check_model', lambda *a, **k:None)
+    data = {name:None for name in PageExtraction.model_fields}
+    data.update(document_type='grid',notes=[],total_payable={'value':999,'unit':'INR','quote':'Invoice payable INR 100'})
+    monkeypatch.setattr('billintel.extraction.api', lambda *a, **k:{'message':{'content':json.dumps(data)}})
+    path=tmp_path/'bill.pdf'
+    with pymupdf.open() as doc:
+        page=doc.new_page()
+        page.insert_text((40,40),'Invoice payable INR 100. '+ 'Synthetic invoice reference information. '*3)
+        doc.save(path)
+    _, result=extract(path,tmp_path/'out','test',engine='llm')
+    row=result['pages'][0]
+    assert row['data']['total_payable'] is None
+    assert row['rejected_candidates']['total_payable']['candidate']['value']==999
+
+
+def test_rules_need_no_model_server(tmp_path, monkeypatch):
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Rules engine must not call Ollama')
+    monkeypatch.setattr('billintel.extraction.api', forbidden)
+    path=tmp_path/'bill.pdf'
+    with pymupdf.open() as doc:
+        page=doc.new_page()
+        page.insert_text((40,40),'High Tension Bill for the Month of April 2025\nNet Amount Payable 900.00\nSynthetic invoice information for local test.')
+        doc.save(path)
+    _, result=extract(path,tmp_path/'out','test',engine='rules')
+    assert result['pages'][0]['data']['total_payable']['value']==900
+    assert result['pages'][0]['model'] is None
+
+def test_total_consumption_does_not_prove_grid_import():
+    data = {name:None for name in PageExtraction.model_fields}
+    data.update(document_type='grid',notes=[],grid_import={'value':125,'unit':'kWh','quote':'Total consumption: 125 kWh'})
+    assert any('source label is absent' in s for s in review_issues(PageExtraction(**data),'Total consumption: 125 kWh'))

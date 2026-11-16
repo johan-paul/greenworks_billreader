@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.request import Request, ProxyHandler, build_opener
 import pymupdf
 from .schema import PageExtraction, review_issues
+from .rules import parse_rules
 
 BASE_URL = 'http://127.0.0.1:11434'
 
@@ -73,12 +74,12 @@ def ocr_page(page):
         return result.stdout.strip()
 
 def extract(path: Path, output: Path, model: str, vision_model: str | None = None,
-            max_pages: int | None = None, force_vision: bool = False, ocr: bool = False):
+            max_pages: int | None = None, force_vision: bool = False, ocr: bool = False, engine: str = "llm"):
     if max_pages is not None and max_pages < 1:
         raise ValueError('max-pages must be positive')
-    check_model(model)
-    if vision_model:
-        check_model(vision_model, vision=True)
+    if engine not in {"llm", "rules", "hybrid"}:
+        raise ValueError("Unknown engine")
+    checked_models = set()
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     output.mkdir(parents=True, exist_ok=True)
     target = output / (path.stem + '-' + digest[:12] + '.json')
@@ -104,18 +105,38 @@ def extract(path: Path, output: Path, model: str, vision_model: str | None = Non
                     raise ValueError('Scanned page requires --vision-model with a downloaded vision model')
                 if not vision and len(text) > 22000:
                     raise ValueError('Page text exceeds safe input limit; rerun using --force-vision')
-                message = {'role': 'user', 'content': PROMPT + json.dumps(PageExtraction.model_json_schema())}
-                if vision:
-                    pix = page.get_pixmap(dpi=160)
-                    message['images'] = [base64.b64encode(pix.tobytes('png')).decode()]
+                parsed = parse_rules(text) if engine != 'llm' and not vision else None
+                if parsed:
+                    data, metadata = parsed
+                    row.update(metadata, engine='rules', model=None)
+                elif engine == 'rules':
+                    raise ValueError('Unsupported layout: rules abstained. Use hybrid/Ollama or review manually.')
                 else:
-                    message['content'] += '\n<bill_page>\n' + text + '\n</bill_page>'
-                response = api('/api/chat', {'model': chosen, 'stream': False,
-                    'messages': [message], 'format': PageExtraction.model_json_schema(),
-                    'options': {'temperature': 0, 'num_ctx': 16384}})
-                data = PageExtraction.model_validate_json(response['message']['content'])
-                row.update(status='needs_review', data=data.model_dump(),
-                           issues=review_issues(data, None if vision else text))
+                    row['engine'] = 'llm'
+                    if chosen not in checked_models:
+                        check_model(chosen, vision=vision)
+                        checked_models.add(chosen)
+                    message = {'role': 'user', 'content': PROMPT + json.dumps(PageExtraction.model_json_schema())}
+                    if vision:
+                        pix = page.get_pixmap(dpi=160)
+                        message['images'] = [base64.b64encode(pix.tobytes('png')).decode()]
+                    else:
+                        message['content'] += '\n<bill_page>\n' + text + '\n</bill_page>'
+                    response = api('/api/chat', {'model': chosen, 'stream': False,
+                        'messages': [message], 'format': PageExtraction.model_json_schema(),
+                        'options': {'temperature': 0, 'num_ctx': 16384}})
+                    data = PageExtraction.model_validate_json(response['message']['content'])
+                issues = review_issues(data, None if vision else text)
+                rejected = {}
+                if row.get('engine') == 'llm' and not vision:
+                    for field in PageExtraction.model_fields:
+                        reasons = [issue for issue in issues if issue.startswith(field + ':') and
+                                   ('quote not found' in issue or 'number is absent' in issue or 'source label is absent' in issue)]
+                        if reasons:
+                            rejected[field] = {'candidate': getattr(data, field).model_dump(), 'reasons': reasons}
+                            setattr(data, field, None)
+                row.update(status='needs_review', data=data.model_dump(), issues=issues,
+                           rejected_candidates=rejected)
                 if use_ocr:
                     row['issues'].append('OCR text may contain recognition errors; compare against the original page.')
             except Exception as exc:

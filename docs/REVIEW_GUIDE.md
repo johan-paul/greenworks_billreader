@@ -1,178 +1,91 @@
-# Tomorrow's review guide - 17 November 2026
+# Explaining Greenworks to your TL
 
-Read this once tonight, then rehearse the opening and demo aloud. You do not need to memorize every function. Understand the data flow, why numbers can be wrong, and how the project detects and handles uncertainty.
+## Your opening
 
-## Your 90-second opening
+> Greenworks is an offline electricity-bill analysis application. The browser uploads a PDF to a local Flask API. A background worker runs a page-by-page extraction pipeline. It reads embedded text or uses Tesseract OCR, then uses layout rules for known formats and a pretrained model through Ollama for unfamiliar formats. Results are checked against typed fields and supporting evidence, stored locally, and shown beside the original page. Savings and emissions are calculated separately from reviewed inputs using explicit formulas.
 
-> My project is an offline electricity-bill intelligence pipeline. The objective is to turn grid and renewable-energy bills into structured, traceable data, then use reviewed data to estimate cost and environmental benefits.
->
-> I inventoried 101 PDFs containing 595 pages. They include both text PDFs and scans, and some files contain several invoices. I use PyMuPDF for embedded text and Tesseract for local OCR. Ollama runs a pretrained model locally for unfamiliar layouts. For recognized layouts, explicit parsing rules are more reliable for numeric fields.
->
-> The first model-only baseline made serious numeric mistakes. On one page it matched four of eight manually checked fields. I added typed units, evidence checks and layout rules. The revised parser matches all eight fields on that same development example. That is not a claim of overall accuracy.
->
-> I can demonstrate consumption extraction, scanned solar supply calculations and payable amounts with source evidence. Savings and emissions are calculated with deterministic formulas after reconciliation, rather than asking the language model to invent them. The next priority is a representative labeled evaluation set and monthly reconciliation across grid and renewable invoices.
+## The five layers to remember
 
-## Live upload dashboard
+1. **Frontend:** `web/index.html`, `style.css`, `app.js` — upload, progress, page preview, results and scenario form.
+2. **API and worker:** `dashboard.py`, `jobs.py`, `cli.py` — accept requests, queue work and run processing without blocking the upload request.
+3. **Extraction:** `extraction.py`, `documents.py`, `rules.py`, `ollama_client.py` — orchestrate pages, read/OCR documents, match known layouts and call the local model.
+4. **Validation and output:** `schema.py`, `exports.py`, `evaluation.py` — type/evidence checks, downloadable reports and comparison with reviewed labels.
+5. **Analytics:** `analytics.py` — calculate energy mix, cost savings and emissions scenarios from reviewed inputs.
 
-For the interactive review, launch `START_DASHBOARD.cmd` and follow [the dashboard walkthrough](DASHBOARD.md). You can upload a PDF and generate a report. The static report below remains a fallback.
+Open [ARCHITECTURE.md](ARCHITECTURE.md) for the diagram, complete file map, API list and code walkthrough order. Use [DASHBOARD.md](DASHBOARD.md) for the live demo.
 
-## Five-minute demonstration
+## Answers you should be able to give
 
-1. Double-click `RUN_REVIEW_DEMO.cmd` from the project folder. It rebuilds the local report using rules and OCR. It does not need Ollama or internet. If Python is not found, use the exact Python executable documented below.
-2. Show the dataset counts and explain the three routes: embedded text, OCR, and model fallback.
-3. On the grid header, point out the normal payable amount versus early-payment and late-payment amounts. Explain why choosing the largest or first number is unsafe.
-4. On the consumption page, point to the kWh and kVAh columns. Explain that they are not interchangeable.
-5. On the scanned solar invoice, show the original page, the two supply quantities, and the computed sum. Each line passes quantity × rate ≈ line amount. Explain that the HSN code identifies the commodity and is not consumption.
-6. Show the review notes and evidence. Missing values are unknown, not zero. Every result remains reviewable.
-7. Show the synthetic scenario: 40% renewable share, INR 80,000 estimated net savings and 26 tonnes estimated avoided CO2e. Explicitly say these are fictional teaching inputs, not measured company savings.
-8. Finish with the limitations and the next milestone. Open GitHub to show version history if internet is available; keep the local repo available as backup.
+**Where does execution start?**
+`START_DASHBOARD.cmd` calls `scripts/start_dashboard.ps1`. That starts `python -m billintel.dashboard`, which builds the Flask app using `create_app()` and serves the frontend at `127.0.0.1:8791`.
 
-Do not run the full dataset through Ollama during the review. Inference latency and accuracy are not yet suitable for that demonstration. The report is reproducible output, not a live LLM run; say so directly.
+**What happens when Analyze is clicked?**
+JavaScript sends a multipart upload. Flask checks the PDF and creates a job. A background thread runs a CLI subprocess. The pipeline saves results after each page; JavaScript polls every two seconds and displays the latest progress.
 
-## What each component does
+**Where is the AI model?**
+The pretrained model is managed by the local Ollama installation, outside this Git repository. `ollama_client.py` sends local API requests; `extraction.py` supplies the prompt and expected JSON schema. `schema.py` defines the data format, not model weights.
 
-| Component | Purpose | What it does not prove |
-|---|---|---|
-| PyMuPDF | Extract embedded PDF text and render pages | Correct reading order or interpretation |
-| Tesseract OCR | Turn scanned page images into text locally | Perfect digit recognition |
-| Ollama | Run downloaded language models locally | It is not itself the trained model |
-| llama3.1:8b | Pretrained model used for structured extraction | Bill-specific accuracy or training on these invoices |
-| Layout rules | Find known labels, units and table patterns | Generalization to unseen utility formats |
-| Pydantic schema | Enforce field types, allowed units and numeric constraints | Whether a plausible value is semantically correct |
-| Evidence validation | Check quoted text and reported number | Correct label-to-number association in every table |
-| SHA-256 | Identify the exact source PDF | Semantic invoice deduplication |
-| Evaluation | Compare selected fields with reviewed labels | Overall accuracy unless the sample is representative |
-| Analytics | Apply explicit arithmetic to reviewed inputs | Verified realized savings or certified emissions reductions |
-| Git | Track source changes and push updates | A backup of private input bills; those are deliberately excluded |
+**Did you train a model?**
+No. This version uses pretrained `llama3.1:8b`, prompts, OCR and parsing rules. Training/fine-tuning is a future decision after labeled evaluation identifies the errors and enough suitable examples are available.
 
-The architecture is: PDF → text/OCR → recognized-layout rules, otherwise Ollama → typed fields and evidence → review and reconciliation → calculation → report.
-
-The CLI defaults to `--engine hybrid`: rules for recognized pages, Ollama for other pages. `--engine rules` is the fast demo mode; unknown layouts return an explicit error. `--engine llm` runs the model-only route for comparisons. Rules leave unmatched fields null; hybrid does not automatically fill every missing field from the LLM on recognized pages.
-
-For text/OCR LLM results, a numeric candidate with a missing quote, a number absent from the quote, or an absent source label for grid/solar/wind/export is moved to `rejected_candidates`; its accepted field becomes null. That still cannot catch every semantic error. Vision results require visual review because there is no extracted text to match against.
-
-## Electricity concepts you should know
-
-- **kWh:** electrical energy used over time. A 1 kW load running for one hour consumes 1 kWh. In ordinary electricity billing, one energy unit usually refers to 1 kWh; always check the bill.
-- **kW:** real power at a point in time or an average over a demand interval. It is not monthly energy.
-- **kVA:** apparent power; often used for industrial contract or maximum demand.
-- **kVAh:** apparent energy. Do not label it kWh or multiply by an unrelated power-factor value.
-- **Power factor:** real power divided by apparent power under the applicable measurement definition. Low power factor can contribute to higher apparent-power demand. Tariff effects must be checked for the specific utility.
-- **Contract demand:** agreed capacity. **Recorded maximum demand:** observed demand. **Billed demand:** tariff-defined chargeable demand; these can differ.
-- **Grid imports:** energy received from the grid. **Exports:** energy sent out. **Solar supply/generation:** not automatically the energy consumed at the factory after losses, exports and banking.
-- **Time-of-day charges:** different charges or rebates for different periods. Peak surcharge units may overlap base energy units; adding them would double-count consumption.
-- **Current charges versus payable:** payable can include arrears, adjustments, taxes, credits and deductions. Payment discounts are separate.
-- **Open-access/PPA renewable purchase:** renewable electricity purchased through a supply arrangement. Wheeling, banking, losses, taxes and adjustments may affect delivered units and actual cost.
-
-Use the term "solar energy supplied or consumed in kWh," not "current from solar," unless the task really requires electrical current in amperes.
-
-## Explain the calculations
-
-All inputs must refer to the same site, meter boundary and period, and must be mutually exclusive.
-
-1. Accounted consumption = grid import + solar used + wind used.
-2. Renewable share = (solar used + wind used) / accounted consumption × 100.
-3. Estimated savings = renewable energy used × avoided marginal grid rate − all-in renewable cost + export credit.
-4. Estimated avoided CO2e = renewable energy used × (grid emission factor − renewable emission factor).
-
-Example: 60,000 kWh grid + 30,000 solar + 10,000 wind = 100,000 kWh. Renewable share is 40%. At an illustrative avoided grid rate of INR 8/kWh and renewable cost of INR 240,000, estimated savings are 40,000 × 8 − 240,000 = INR 80,000. At illustrative factors of 0.70 and 0.05 kg CO2e/kWh, estimated avoided emissions are 26,000 kg = 26 tonnes.
-
-Do not use total bill / kWh as the avoided rate without checking fixed charges and demand charges. Do not claim all solar energy is consumed on-site. Emissions factors need an approved source, year, geography and accounting method. The calculation is a scenario estimate, not a corporate carbon inventory or a carbon-credit claim.
-
-Environmental value: identify waste, compare energy per unit of production, evaluate load shifting, and assess renewable substitution. Lower bills do not automatically imply lower energy use or emissions. Production changes, tariff changes and billing days can explain differences.
-
-## Questions the TL may ask
-
-**Did you train an AI model?**
-No. This version uses a pretrained model through Ollama, with prompting, a schema and deterministic parsers. I have not fine-tuned it. Fine-tuning requires labeled examples, an evaluation split and evidence that it addresses the measured errors.
-
-**Why Ollama?**
-It provides a local inference runtime and API for downloaded models, fitting the offline requirement. Model quality, speed and hardware needs still need evaluation. Initial dependency and model downloads require internet; processing can run locally afterward.
-
-**Why not just use regex?**
-Known layouts benefit from predictable label-based parsing, but the dataset has many layouts and scans. The model offers a fallback for unfamiliar layouts. Both routes need evidence, validation and measured evaluation. The current demo is deliberately clear about using rules.
+**Does every upload use the LLM?**
+No. In Automatic mode, recognized page layouts use rules. Unknown layouts fall back to Ollama. Quick mode uses only rules; model-only mode uses Ollama. On a recognized page, missing fields remain null rather than automatically invoking the LLM for each missing field.
 
 **Why not use only the LLM?**
-The baseline confused money with energy, HSN codes with quantities and early-payment amounts with normal payable amounts. Valid JSON does not imply a correct answer. A hybrid approach reduces avoidable numeric errors on recognized formats.
+It made errors such as treating an HSN commodity code as consumption and choosing an early-payment amount as normal payable. Known-layout parsing improves selected examples. Valid JSON does not mean the values are correct.
+
+**Why OCR and an LLM?**
+OCR converts scanned images into text. Extraction interprets that text as fields. Errors can occur at either stage, so the original image and supporting text remain available for review.
+
+**What is validated?**
+Allowed units, numeric ranges and output structure; whether numeric quotes occur in text; whether the number and relevant source label appear in their quote. Unsupported text/OCR numeric model candidates are quarantined. These checks do not catch every incorrect label/value association.
+
+**Where is the database?**
+There is no database yet. PDFs, logs and results are local files under `output/dashboard/<job-id>/`. Job state lives in server memory; sidebar history lives in browser memory. Files survive restart, but job/history recovery is not implemented.
+
+**Why a background worker?**
+OCR and model inference are slow. The upload returns a job ID promptly while processing continues. One extraction subprocess runs at a time; this is a simple local worker, not Celery or a distributed queue.
+
+**What does complete mean?**
+Every PDF page processed without a page error. It does not mean human-verified or accurate. A successful first-two-page preview can finish while the document remains incomplete.
+
+**How are reports produced?**
+The browser displays page JSON. `exports.py` creates HTML, CSV and JSON downloads. These exports do not automatically aggregate repeated totals or merge invoices.
+
+**How do savings work?**
+Renewable energy used × avoided marginal grid rate − all-in renewable cost + export credit. The user supplies reviewed values for one site and period. The invoice alone may not contain losses, delivered renewable energy or all costs.
+
+**How do emissions work?**
+Renewable energy used × (grid factor − renewable factor). Factors need an approved source/year/accounting method. The example uses illustrative values and is not a certified carbon claim.
 
 **What is your accuracy?**
-The previous model-only baseline matched 4/8 selected fields on one grid page. The rule-based revision matches 8/8 on the same development example. These are not held-out results. The software test suite checks arithmetic, validation, evidence rejection, parser behavior and offline rules execution; use the latest test run for its current count. I will report dataset accuracy only after independently labeled, representative evaluation.
+The historical model-only baseline matched 4 of 8 selected fields on one grid page. Revised rules matched 8 of those 8 fields on the same development example. This is not held-out or dataset-wide accuracy. The 26 software tests check program behavior, not overall model accuracy.
 
-**How much of the dataset is supported?**
-The text-only coverage scan recognized layout patterns on 199/595 pages: 133 MSEDCL headers, 42 MSEDCL consumption pages and 24 TANGEDCO headers. Another 280 text pages were not matched, and 116 pages need OCR or blank-page review. Recognition is not complete field coverage. The selected solar OCR example is additional demo evidence, not part of the text-only count.
+**What dataset coverage do you have?**
+The earlier inventory found 101 PDFs and 595 pages. Text-only layout recognition matched 199 pages; 280 text pages were unmatched and 116 needed OCR or blank-page review. Recognition is not complete extraction or proof of correctness.
 
-**Why are some values null?**
-The value is missing, ambiguous, unsupported or rejected. Null is safer and more honest than guessing zero. Review is still necessary.
+**How is it offline?**
+The frontend assets, Flask API, PDF processing, OCR and Ollama inference run locally. Models/dependencies need internet for initial installation. The Ollama client uses loopback and rejects cloud-model metadata. This has not been certified through a full network-isolation audit.
 
-**Can it calculate actual savings now?**
-It can calculate scenarios from reviewed inputs. Actual savings need reconciled delivered energy, the avoidable tariff, renewable costs, losses, taxes and a defensible baseline. The demo does not claim measured company savings.
+**Can it process procurement invoices?**
+Not reliably. The current schema and rules are for electricity and renewable-energy invoices. General invoices need their own fields and evaluation.
 
-**How do you avoid double counting?**
-The prototype keeps results per page and does not automatically aggregate them. Next we need invoice grouping, account/site/period matching, duplicate detection and reconciliation of utility adjustments with supplier invoices. A PDF may contain many bills, and several pages may repeat the same total.
+**What comes next?**
+Representative manually reviewed labels; document-level train/validation/test splits; measurement of OCR and extraction errors; stronger layout coverage/model comparisons; invoice grouping and grid/renewable reconciliation. Fine-tune only if measured results justify it.
 
-**How will you evaluate properly?**
-Manually label fields, values, units and evidence across utilities, suppliers, scans and low-quality pages. Keep pages from the same invoice in the same split. Hold out whole documents and preferably some templates/suppliers. Measure numeric-and-unit accuracy, missing-value handling, field coverage, false positives, processing failures and latency. Include abstentions instead of hiding failures.
+## Concepts to remember
 
-**How is data kept private?**
-Input bills and outputs stay local and are ignored by Git. Ollama requests go to 127.0.0.1, proxying is disabled for those requests, and cloud-model metadata is rejected. The report embeds private source pages, so it also stays out of Git. This is not a formal network-isolation audit.
+- kWh = energy; kW = power; kVA = apparent power; kVAh = apparent energy. Never silently substitute one unit for another.
+- Solar supplied is not necessarily solar used after losses, exports and banking.
+- Payable amount can include adjustments, arrears and taxes; it is not automatically an avoidable energy cost.
+- Peak surcharge units can overlap base consumption. Adding every units row double-counts energy.
+- Null means unknown, absent or rejected. It does not mean zero.
+- A PDF can contain multiple invoices and repeated amounts. A file hash identifies bytes, not duplicate commercial invoices.
 
-**Can we deploy it?**
-It is an internship prototype. Before production: broader evaluation, review controls, invoice reconciliation, security/access controls, logging and operational testing are needed. Do not promise a production accuracy number tomorrow.
+## Before the walkthrough
 
-**What code did you write, and did you use AI assistance?**
-Explain the modules you can walk through and be transparent that you used an AI coding assistant. Say you are validating the code, understanding its behavior and measuring its limitations. Do not claim you personally implemented or trained something you cannot explain.
-
-## What to ask your TL
-
-- Which three output fields and which bill types should be prioritized first?
-- Is the renewable data supplied, injected, adjusted, banked or delivered energy? Who can confirm the reconciliation rules?
-- Can we get a small set of accountant/engineer-verified labels and an acceptance threshold?
-- Which tariff baseline, renewable costs and emission-factor source should be used?
-- Is the expected deliverable a CLI, dashboard, API, batch report or integration?
-- Which hardware will run the offline system, and what turnaround time is acceptable?
-
-## Proposed next milestone (agree scope, do not promise blindly)
-
-1. Establish labels and evaluation split for representative invoices.
-2. Expand supported layouts and benchmark the local model/OCR alternatives.
-3. Implement reviewed invoice grouping and grid/solar/wind reconciliation.
-4. Add monthly trends, energy intensity and review/export workflows.
-5. Validate on unseen documents and document failures before deployment.
-
-## Tonight and tomorrow morning
-
-- Run the demo once and keep the generated HTML open as a backup.
-- Read the source evidence on the demo pages and rehearse the 90-second opening twice.
-- Know which examples are real extractions and which numbers are synthetic scenarios.
-- Rehearse the honest answers about training, accuracy, offline behavior and limitations.
-- Charge the laptop, keep the dataset local, and do not depend on a model download tomorrow.
-- If a live model call is slow or wrong, show the review workflow and saved report; do not hide it.
-
-## Commands and troubleshooting
-
-From the project folder:
-
-```powershell
-python -m scripts.prepare_review
-Start-Process 'output/review/review-demo.html'
-python -m pytest -q
-python -m billintel.cli models
-python -m billintel.cli extract 'path\to\bill.pdf' --engine hybrid --ocr --max-pages 1
-python -m billintel.cli analyze examples/scenario.json
-```
-
-Known Python executable on this machine:
-
-```powershell
-& 'C:/Users/Johan Paul/anaconda3/python.exe' -m scripts.prepare_review
-```
-
-If the report already exists, opening it needs no Python, OCR or Ollama. If model listing fails, start Ollama; the rules demo still works without it. If OCR fails, check the Tesseract installation and English language data. Unsupported layouts are expected to abstain in rules mode.
-
-## References to understand, not memorize
-
-- Ollama structured outputs: https://docs.ollama.com/capabilities/structured-outputs
-- Ollama local/offline configuration: https://docs.ollama.com/faq
-- GHG Protocol Scope 2 Guidance: https://ghgprotocol.org/scope-2-guidance
-
-These references inform the design. No official emissions factor is embedded in this prototype.
+1. Open the dashboard and test the selected examples.
+2. Open `docs/ARCHITECTURE.md` and follow the code order at its end.
+3. Be clear that scenario numbers are fictional unless inputs were actually reviewed.
+4. Be transparent about using AI coding assistance; explain the parts you understand and the measured limitations.
+5. Ask the TL for priority fields, representative verified labels, a tariff/emissions methodology and an acceptance threshold.

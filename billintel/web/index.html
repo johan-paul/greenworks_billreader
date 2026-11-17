@@ -1,11 +1,313 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Greenworks — Bill intelligence</title><link rel="stylesheet" href="/assets/style.css"></head>
-<body><aside><a class="brand" href="/">◈ <span>greenworks<small>BILL INTELLIGENCE</small></span></a><div class="navtitle">WORKSPACE</div><button class="nav active" id="navReport">▤ &nbsp; Bill analysis</button><button class="nav" id="navScenario">◉ &nbsp; Savings & impact</button><div class="navtitle">THIS SESSION</div><div id="history" class="history"><p>Your uploaded bills will appear here.</p></div><div class="local"><span class="dot"></span> Local workspace<p>Files stay on this computer.<br>No cloud processing.</p></div></aside>
-<main><header><span>ENERGY INTELLIGENCE / WORKSPACE</span><span class="status" id="modelStatus">Checking local model…</span></header>
-<section id="reportView"><div class="heading"><div><div class="eyebrow">UNDERSTAND EVERY UNIT</div><h1>Make your bills<br><em>tell the full story.</em></h1><p>Upload an electricity bill. Explore consumption, charges<br class="wide"> and renewable supply with evidence you can check.</p></div><div class="heroIcon">↗<span>POWERED LOCALLY</span></div></div>
-<div class="uploadpanel"><div id="dropzone" class="dropzone"><div class="uploadicon">↑</div><h2 id="fileTitle">Drop your electricity bill here</h2><p id="fileHint">PDF · up to 30 MB · up to 100 pages</p><label class="browse" for="file">Choose PDF</label><input id="file" type="file" accept="application/pdf,.pdf" class="fileinput"></div><div class="uploadOptions"><label>Processing mode<select id="engine"><option value="hybrid">Automatic · rules + Ollama</option><option value="rules">Quick · recognized layouts only</option><option value="llm">Ollama · model only</option></select></label><label>Pages to process<select id="limit"><option value="0">All pages</option><option value="1">First page · quick preview</option><option value="2">First 2 pages</option><option value="5">First 5 pages</option></select></label><label>Local model<select id="model"><option>llama3.1:8b</option></select></label><button id="analyze" class="primary" disabled>Analyze bill <span>↗</span></button><small>Scanned pages use local OCR. Unfamiliar layouts may take several minutes per page and require review.</small></div></div>
-<div id="error" class="error" role="alert" hidden></div><div id="progressBox" class="progressBox" hidden><div><b id="progressTitle">Processing</b><span id="progressText"></span></div><progress id="progress" value="0" max="100"></progress><p>Keep this page open. Results appear as each page finishes. No amounts are added across pages.</p></div>
-<div id="empty" class="emptyCards"><article><span>01 / EXTRACT</span><h3>Numbers with context</h3><p>Energy, payable amounts, billing periods and demand — with their original units.</p></article><article><span>02 / VERIFY</span><h3>Evidence beside the bill</h3><p>Inspect the source page, supporting text and any values that need attention.</p></article><article><span>03 / UNDERSTAND</span><h3>Explore the impact</h3><p>Estimate savings and emissions using reviewed energy and explicit assumptions.</p></article></div>
-<section id="results" hidden><div class="resultsHeading"><div><div class="eyebrow">YOUR BILL REPORT</div><h2 id="reportTitle"></h2><p id="reportMeta"></p></div><div class="downloads"><a id="downloadHtml" class="secondary">Download report</a><a id="downloadCsv">CSV</a><a id="downloadJson">JSON</a></div></div><div class="pageBar"><label>Inspect page <select id="pageSelect"></select></label><span id="pageMethod" class="pill"></span></div><div class="notice">Review required. Metrics below belong to the selected page. A PDF may contain multiple invoices; missing values are unknown, not zero.</div><div id="metrics" class="metrics"></div><div class="reportColumns"><article class="panel"><div class="panelTitle"><h3>Original bill</h3><a id="openPreview" target="_blank" rel="noopener">Open full size ↗</a></div><img id="pageImage" alt="Selected original bill page"></article><div><article class="panel"><h3>Extracted details</h3><div id="fieldTable"></div></article><article class="panel"><h3>Findings & next steps</h3><ul id="insights"></ul></article><article class="panel"><h3>Checks & evidence</h3><ul id="issues"></ul><details><summary>See rejected candidates</summary><pre id="rejected"></pre></details></article></div></div></section></section>
-<section id="scenarioView" hidden><div class="eyebrow">TURN REVIEWED DATA INTO INSIGHT</div><h1>Savings & <em>impact.</em></h1><p class="lead">A transparent scenario for one site and billing period.</p><div class="notice">A bill alone may not establish actual savings. Enter reconciled, non-overlapping delivered energy and approved assumptions. These estimates are not certified carbon reductions.</div><form id="scenarioForm" class="panel"><div class="formGrid"><label>Site / facility<input name="site" required placeholder="e.g. Factory A"></label><label>Billing period<input name="period" required placeholder="e.g. April 2026"></label><label>Grid import used (kWh)<input name="grid_import_kwh" type="number" min="0" step="any" required></label><label>Solar used on site (kWh)<input name="solar_used_kwh" type="number" min="0" step="any" required></label><label>Wind used on site (kWh)<input name="wind_used_kwh" type="number" min="0" step="any" required></label><label>Avoided marginal grid rate (₹/kWh)<input name="avoided_grid_rate_inr_per_kwh" type="number" min="0" step="any" required></label><label>All-in renewable cost (₹)<input name="renewable_cost_inr" type="number" min="0" step="any" required></label><label>Export credit (₹)<input name="export_credit_inr" type="number" min="0" step="any" required></label><label>Grid factor (kg CO₂e/kWh)<input name="grid_emission_kg_per_kwh" type="number" min="0" step="any" required></label><label>Renewable factor (kg CO₂e/kWh)<input name="renewable_emission_kg_per_kwh" type="number" min="0" step="any" required></label><label>Power factor (optional)<input name="power_factor" type="number" min="0.0001" max="1" step="any"></label><label>Penalties (₹, optional)<input name="penalties_inr" type="number" min="0" step="any"></label></div><label>Source of rates, factors and reconciliation assumptions<textarea name="assumptions_source" required placeholder="Describe the tariff, emission-factor source/year, losses and renewable costs included."></textarea></label><label class="check"><input name="reviewed" type="checkbox" required> I reviewed these inputs for one site and period, including losses, costs and overlapping bills.</label><div class="formActions"><button class="primary" type="submit">Calculate scenario ↗</button><button class="secondary" id="example" type="button">Load fictional example</button></div><div id="scenarioError" class="error" hidden role="alert"></div></form><div id="scenarioResults" hidden><h2>Scenario estimate</h2><p id="scenarioLabel"></p><div id="scenarioMetrics" class="metrics"></div><div class="panel"><h3>Energy mix</h3><div id="energyMix" class="mix"></div><p id="mixLegend"></p><h3>Recommendations</h3><ul id="scenarioAdvice"></ul><h3>Assumptions & limitations</h3><ul id="scenarioLimits"></ul><button id="scenarioDownload" class="secondary">Download scenario JSON</button></div></div></section>
-<footer>Greenworks · Offline bill intelligence <span>Reviewable data. Transparent calculations.</span></footer></main><script src="/assets/app.js"></script></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Greenworks — Bill intelligence</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <aside>
+      <a class="brand" href="/"
+        >◈ <span>greenworks<small>BILL INTELLIGENCE</small></span></a
+      >
+      <div class="navtitle">WORKSPACE</div>
+      <button class="nav active" id="navReport">▤ &nbsp; Bill analysis</button
+      ><button class="nav" id="navScenario">◉ &nbsp; Savings & impact</button>
+      <div class="navtitle">THIS SESSION</div>
+      <div id="history" class="history">
+        <p>Your uploaded bills will appear here.</p>
+      </div>
+      <div class="local">
+        <span class="dot"></span> Local workspace
+        <p>Files stay on this computer.<br />No cloud processing.</p>
+      </div>
+    </aside>
+    <main>
+      <header>
+        <span>ENERGY INTELLIGENCE / WORKSPACE</span
+        ><span class="status" id="modelStatus">Checking local model…</span>
+      </header>
+      <section id="reportView">
+        <div class="heading">
+          <div>
+            <div class="eyebrow">UNDERSTAND EVERY UNIT</div>
+            <h1>Make your bills<br /><em>tell the full story.</em></h1>
+            <p>
+              Upload an electricity bill. Explore consumption, charges<br
+                class="wide"
+              />
+              and renewable supply with evidence you can check.
+            </p>
+          </div>
+          <div class="heroIcon">↗<span>POWERED LOCALLY</span></div>
+        </div>
+        <div class="uploadpanel">
+          <div id="dropzone" class="dropzone">
+            <div class="uploadicon">↑</div>
+            <h2 id="fileTitle">Drop your electricity bill here</h2>
+            <p id="fileHint">PDF · up to 30 MB · up to 100 pages</p>
+            <label class="browse" for="file">Choose PDF</label
+            ><input
+              id="file"
+              type="file"
+              accept="application/pdf,.pdf"
+              class="fileinput"
+            />
+          </div>
+          <div class="uploadOptions">
+            <label
+              >Processing mode<select id="engine">
+                <option value="hybrid">Automatic · rules + Ollama</option>
+                <option value="rules">Quick · recognized layouts only</option>
+                <option value="llm">Ollama · model only</option>
+              </select></label
+            ><label
+              >Pages to process<select id="limit">
+                <option value="0">All pages</option>
+                <option value="1">First page · quick preview</option>
+                <option value="2">First 2 pages</option>
+                <option value="5">First 5 pages</option>
+              </select></label
+            ><label
+              >Local model<select id="model">
+                <option>llama3.1:8b</option>
+              </select></label
+            ><button id="analyze" class="primary" disabled>
+              Analyze bill <span>↗</span></button
+            ><small
+              >Scanned pages use local OCR. Unfamiliar layouts may take several
+              minutes per page and require review.</small
+            >
+          </div>
+        </div>
+        <div id="error" class="error" role="alert" hidden></div>
+        <div id="progressBox" class="progressBox" hidden>
+          <div>
+            <b id="progressTitle">Processing</b><span id="progressText"></span>
+          </div>
+          <progress id="progress" value="0" max="100"></progress>
+          <p>
+            Keep this page open. Results appear as each page finishes. No
+            amounts are added across pages.
+          </p>
+        </div>
+        <div id="empty" class="emptyCards">
+          <article>
+            <span>01 / EXTRACT</span>
+            <h3>Numbers with context</h3>
+            <p>
+              Energy, payable amounts, billing periods and demand — with their
+              original units.
+            </p>
+          </article>
+          <article>
+            <span>02 / VERIFY</span>
+            <h3>Evidence beside the bill</h3>
+            <p>
+              Inspect the source page, supporting text and any values that need
+              attention.
+            </p>
+          </article>
+          <article>
+            <span>03 / UNDERSTAND</span>
+            <h3>Explore the impact</h3>
+            <p>
+              Estimate savings and emissions using reviewed energy and explicit
+              assumptions.
+            </p>
+          </article>
+        </div>
+        <section id="results" hidden>
+          <div class="resultsHeading">
+            <div>
+              <div class="eyebrow">YOUR BILL REPORT</div>
+              <h2 id="reportTitle"></h2>
+              <p id="reportMeta"></p>
+            </div>
+            <div class="downloads">
+              <a id="downloadHtml" class="secondary">Download report</a
+              ><a id="downloadCsv">CSV</a><a id="downloadJson">JSON</a>
+            </div>
+          </div>
+          <div class="pageBar">
+            <label
+              >Inspect page
+              <select id="pageSelect"></select></label
+            ><span id="pageMethod" class="pill"></span>
+          </div>
+          <div class="notice">
+            Review required. Metrics below belong to the selected page. A PDF
+            may contain multiple invoices; missing values are unknown, not zero.
+          </div>
+          <div id="metrics" class="metrics"></div>
+          <div class="reportColumns">
+            <article class="panel">
+              <div class="panelTitle">
+                <h3>Original bill</h3>
+                <a id="openPreview" target="_blank" rel="noopener"
+                  >Open full size ↗</a
+                >
+              </div>
+              <img id="pageImage" alt="Selected original bill page" />
+            </article>
+            <div>
+              <article class="panel">
+                <h3>Extracted details</h3>
+                <div id="fieldTable"></div>
+              </article>
+              <article class="panel">
+                <h3>Findings & next steps</h3>
+                <ul id="insights"></ul>
+              </article>
+              <article class="panel">
+                <h3>Checks & evidence</h3>
+                <ul id="issues"></ul>
+                <details>
+                  <summary>See rejected candidates</summary>
+                  <pre id="rejected"></pre>
+                </details>
+              </article>
+            </div>
+          </div>
+        </section>
+      </section>
+      <section id="scenarioView" hidden>
+        <div class="eyebrow">TURN REVIEWED DATA INTO INSIGHT</div>
+        <h1>Savings & <em>impact.</em></h1>
+        <p class="lead">
+          A transparent scenario for one site and billing period.
+        </p>
+        <div class="notice">
+          A bill alone may not establish actual savings. Enter reconciled,
+          non-overlapping delivered energy and approved assumptions. These
+          estimates are not certified carbon reductions.
+        </div>
+        <form id="scenarioForm" class="panel">
+          <div class="formGrid">
+            <label
+              >Site / facility<input
+                name="site"
+                required
+                placeholder="e.g. Factory A" /></label
+            ><label
+              >Billing period<input
+                name="period"
+                required
+                placeholder="e.g. April 2026" /></label
+            ><label
+              >Grid import used (kWh)<input
+                name="grid_import_kwh"
+                type="number"
+                min="0"
+                step="any"
+                required /></label
+            ><label
+              >Solar used on site (kWh)<input
+                name="solar_used_kwh"
+                type="number"
+                min="0"
+                step="any"
+                required /></label
+            ><label
+              >Wind used on site (kWh)<input
+                name="wind_used_kwh"
+                type="number"
+                min="0"
+                step="any"
+                required /></label
+            ><label
+              >Avoided marginal grid rate (₹/kWh)<input
+                name="avoided_grid_rate_inr_per_kwh"
+                type="number"
+                min="0"
+                step="any"
+                required /></label
+            ><label
+              >All-in renewable cost (₹)<input
+                name="renewable_cost_inr"
+                type="number"
+                min="0"
+                step="any"
+                required /></label
+            ><label
+              >Export credit (₹)<input
+                name="export_credit_inr"
+                type="number"
+                min="0"
+                step="any"
+                required /></label
+            ><label
+              >Grid factor (kg CO₂e/kWh)<input
+                name="grid_emission_kg_per_kwh"
+                type="number"
+                min="0"
+                step="any"
+                required /></label
+            ><label
+              >Renewable factor (kg CO₂e/kWh)<input
+                name="renewable_emission_kg_per_kwh"
+                type="number"
+                min="0"
+                step="any"
+                required /></label
+            ><label
+              >Power factor (optional)<input
+                name="power_factor"
+                type="number"
+                min="0.0001"
+                max="1"
+                step="any" /></label
+            ><label
+              >Penalties (₹, optional)<input
+                name="penalties_inr"
+                type="number"
+                min="0"
+                step="any"
+            /></label>
+          </div>
+          <label
+            >Source of rates, factors and reconciliation assumptions<textarea
+              name="assumptions_source"
+              required
+              placeholder="Describe the tariff, emission-factor source/year, losses and renewable costs included."
+            ></textarea></label
+          ><label class="check"
+            ><input name="reviewed" type="checkbox" required /> I reviewed these
+            inputs for one site and period, including losses, costs and
+            overlapping bills.</label
+          >
+          <div class="formActions">
+            <button class="primary" type="submit">Calculate scenario ↗</button
+            ><button class="secondary" id="example" type="button">
+              Load fictional example
+            </button>
+          </div>
+          <div id="scenarioError" class="error" hidden role="alert"></div>
+        </form>
+        <div id="scenarioResults" hidden>
+          <h2>Scenario estimate</h2>
+          <p id="scenarioLabel"></p>
+          <div id="scenarioMetrics" class="metrics"></div>
+          <div class="panel">
+            <h3>Energy mix</h3>
+            <div id="energyMix" class="mix"></div>
+            <p id="mixLegend"></p>
+            <h3>Recommendations</h3>
+            <ul id="scenarioAdvice"></ul>
+            <h3>Assumptions & limitations</h3>
+            <ul id="scenarioLimits"></ul>
+            <button id="scenarioDownload" class="secondary">
+              Download scenario JSON
+            </button>
+          </div>
+        </div>
+      </section>
+      <footer>
+        Greenworks · Offline bill intelligence
+        <span>Reviewable data. Transparent calculations.</span>
+      </footer>
+    </main>
+    <script src="/assets/app.js"></script>
+  </body>
+</html>

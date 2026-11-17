@@ -1,8 +1,8 @@
-# Validation record - 16 November 2026
+# Validation record - 17 November 2026
 
 ## Automated checks
 
-`python -m pytest -q`: **22 passed**. Tests cover scenario arithmetic, invalid inputs, units, quote evidence, quarantined numeric candidates, source-label requirements, local OCR routing, page provenance, partial runs, evaluation behavior, supported rule patterns, arithmetic mismatches, unsupported layouts, and rules execution without an Ollama server.
+`python -m pytest -q`: **26 passed**. Tests cover scenario arithmetic, invalid inputs, units, quote evidence, quarantined numeric candidates, source-label requirements, local OCR routing, page provenance, partial runs, evaluation behavior, supported rule patterns, arithmetic mismatches, unsupported layouts, and rules execution without an Ollama server.
 
 Software test success is not model extraction accuracy.
 
@@ -21,7 +21,7 @@ The installed local `llama3.1:8b` processed a synthetic PDF through the model-on
 
 ## Demonstration and privacy checks
 
-- `python -m scripts.prepare_review` rebuilt the private report, scenario output, inventory summary and matching-label evaluation.
+- Earlier static review outputs remain under `output/review/`. Their obsolete generator has been removed; the upload dashboard is the maintained workflow.
 - The report is self-contained HTML with embedded source images and no external scripts/styles. Its opening layout was rendered in headless Edge and inspected.
 - The static report is a rules/OCR demonstration, not a live model run or a production dashboard.
 - The scenario is synthetic and calculates 40% renewable share, INR 80,000 estimated net savings and 26,000 kg estimated avoided CO2e. Its rates and factors are illustrative.
@@ -30,3 +30,7 @@ The installed local `llama3.1:8b` processed a synthetic PDF through the model-on
 ## Outstanding validation
 
 Representative independent labels, held-out document testing, unseen template testing, OCR robustness, model comparisons, measured latency, invoice deduplication and reconciliation, approved tariffs and emissions factors, and production operational/security review remain outstanding.
+
+## Architecture cleanup validation
+
+After separating the Ollama client, document helpers, background worker and export renderer, all 26 tests passed. Frontend files were expanded with Prettier; Python was formatted with Black. Unused imports and undefined names were checked with Ruff. No model retraining or new accuracy claim is part of this refactor.

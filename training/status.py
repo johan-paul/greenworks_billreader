@@ -44,6 +44,28 @@ def display(root):
                 "WARNING: progress is stale; check the process and logs. Completion is not confirmed."
             )
     print("Generation evaluation:", "COMPLETE" if evaluation else "pending or running")
+    evaluation_progress = read(run / "evaluation-progress.json", {})
+    if evaluation_progress and not evaluation:
+        base = evaluation_progress.get("base", [])
+        adapter = evaluation_progress.get("adapter", [])
+        per_model = report.get("example_counts", {}).get("test", 3) if report else 3
+        print(
+            f"Evaluation examples completed: {len(base) + len(adapter)}/{2 * per_model} "
+            f"(base {len(base)}/{per_model}, adapter {len(adapter)}/{per_model})"
+        )
+        age = max(0, time.time() - (run / "evaluation-progress.json").stat().st_mtime)
+        print(
+            f"Last evaluation result: {age:.0f} seconds ago. Results update after each full generation."
+        )
+        if adapter:
+            print(
+                f"Adapter schema-valid outputs so far: {sum(r['schema_valid'] for r in adapter)}/{len(adapter)}; "
+                "schema validity is not field accuracy."
+            )
+        if age > 600:
+            print(
+                "WARNING: evaluation progress is stale; inspect follow-up logs/process before assuming it is running."
+            )
     if evaluation:
         print(
             "Experimental import gate:",

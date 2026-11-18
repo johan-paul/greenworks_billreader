@@ -134,7 +134,7 @@ Fixed grid charges are assumed unchanged. Exports are excluded from consumed-ene
 
 ## What this application is not
 
-No model training/fine-tuning, RAG/vector database, automatic invoice reconciliation, robust duplicate-invoice detection, production authentication, durable job scheduler or procurement-invoice extractor is implemented. Vision support exists only as an optional CLI path and is not validated on this dataset. The dashboard uses OCR for scans.
+The dashboard itself does not train models. Experimental CPU LoRA tools are isolated under `training/` (see [TRAINING.md](TRAINING.md)). No RAG/vector database, automatic invoice reconciliation, robust duplicate-invoice detection, production authentication, durable job scheduler or procurement-invoice extractor is implemented. Vision support exists only as an optional CLI path and is not validated on this dataset. The dashboard uses OCR for scans.
 
 The Flask development server is for a local single-user prototype. Loopback binding and origin checks are not a full security or network-isolation audit. Source text remains untrusted; quotes and numeric checks reduce mistakes but do not prove accuracy.
 
@@ -150,6 +150,10 @@ The Flask development server is for a local single-user prototype. Loopback bind
 8. `exports.py`: report generation.
 9. `analytics.py`: reviewed inputs and formulas.
 10. `evaluation.py` and `tests/`: quality measurement and regression protection.
+
+## Experimental training boundary
+
+`training/prepare_data.py` creates private draft annotations and grouped datasets; `training/train_lora.py` trains a separate adapter in `.venv-training`. These are developer tools, not dashboard request handlers. Draft candidates are not treated as verified labels. Experimental checkpoints stay under `output/training/` and are not automatically imported into Ollama.
 
 ## Cleanup performed
 

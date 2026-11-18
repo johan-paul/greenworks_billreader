@@ -1,0 +1,5 @@
+# Install in .venv-training, separate from the dashboard environment.
+# Install torch==2.8.0 from the PyTorch CPU wheel index first.
+transformers==4.57.1
+peft==0.17.1
+accelerate==1.11.0

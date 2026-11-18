@@ -20,6 +20,7 @@ Install Tesseract with English language data for scans. Ollama and a downloaded 
 - [Architecture and file-by-file walkthrough](docs/ARCHITECTURE.md) — start here for code review.
 - [Dashboard instructions](docs/DASHBOARD.md) — upload, demo, downloads and troubleshooting.
 - [Review speaking notes](docs/REVIEW_GUIDE.md) — explanation and likely TL questions.
+- [Local training workflow](docs/TRAINING.md) — draft labels, grouped splits and experimental CPU LoRA training.
 - [Validation record](docs/VALIDATION.md) — tested behavior and accuracy limitations.
 
 ## Application structure
@@ -54,7 +55,7 @@ tests/                     Regression and integration tests
 | Quick / `rules` | No model needed; unsupported layouts return explicit page errors. |
 | Model only / `llm` | Ollama extraction, followed by schema and evidence checks. |
 
-Every result needs review. Missing or rejected values remain unknown, not zero. PDFs can contain multiple invoices, so page amounts are not automatically added together. Solar supply is not assumed to equal delivered self-consumption. The current system uses a pretrained model; it has not been trained or fine-tuned on these bills.
+Every result needs review. Missing or rejected values remain unknown, not zero. PDFs can contain multiple invoices, so page amounts are not automatically added together. Solar supply is not assumed to equal delivered self-consumption. The dashboard still uses its original pretrained model. Experimental local fine-tuning is kept separate under `training/`; see the training guide for its data and evaluation limits.
 
 ## CLI and tests
 

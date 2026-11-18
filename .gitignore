@@ -15,3 +15,7 @@ __pycache__/
 # Local development tools
 .ruff_cache/
 node_modules/
+
+.venv-training/
+training_data/
+models/

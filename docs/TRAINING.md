@@ -93,6 +93,8 @@ Run files:
 
 ### Automated local workflow
 
+For a live progress display, run `python -m training.status --watch` from the project folder. It refreshes every 30 seconds; Ctrl+C stops only the display. It reports saved training steps, label statuses, rough timing estimates and log paths. Estimates exclude manual review and are not guaranteed completion times. Local TL demonstration files are under `output/training/tl-samples/`: a readable sample explanation, a full reviewed input/target pair, and an automatic draft with failed evidence checks. These private examples are excluded from Git.
+
 `training/auto_label.py` uses the installed local Ollama model to propose labels. It preserves existing reviewed targets and stores machine output in `pseudo_target`, never changing `reviewed=false` to true. It checks numeric evidence, source identities, rule disagreements and missing numeric coverage. A passing status means only that these checks passed, not that the label is correct or complete. Private outputs remain under `output/training/`.
 
 ```powershell

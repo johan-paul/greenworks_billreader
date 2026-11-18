@@ -78,7 +78,10 @@ async function health() {
       ? "● Ollama connected · local"
       : "○ Ollama offline · quick mode available";
     if (h.models.length) {
+      const selected = $("model").value || "llama3.1:8b";
       $("model").replaceChildren(...h.models.map((m) => new Option(m, m)));
+      if (h.models.includes(selected)) $("model").value = selected;
+      else if (h.models.includes("llama3.1:8b")) $("model").value = "llama3.1:8b";
     }
   } catch {
     $("modelStatus").textContent = "Local service unavailable";

@@ -91,6 +91,24 @@ Run files:
 
 ## What to measure next
 
+### Automated local workflow
+
+`training/auto_label.py` uses the installed local Ollama model to propose labels. It preserves existing reviewed targets and stores machine output in `pseudo_target`, never changing `reviewed=false` to true. It checks numeric evidence, source identities, rule disagreements and missing numeric coverage. A passing status means only that these checks passed, not that the label is correct or complete. Private outputs remain under `output/training/`.
+
+```powershell
+python -m training.auto_label output/training/reviewed-v2.jsonl output/training/auto-label-v1
+```
+
+The command resumes completed pages. It refuses to resume if the source file, model digest, prompt or generation settings changed. Each page is saved atomically under `pages/`; `progress.json` records counts. `annotations.jsonl` is reconstructed at the end of a run. Do not run two workers against the same output directory. Windows file replacement retries brief sharing conflicts. Failed and flagged pages need review; machine output is not automatically promoted into training or evaluation labels.
+
+`training/evaluate_adapter.py` generates answers from the exact base model and trained adapter on the held-out test split, verifies the dataset hashes, and reports schema validity, numeric/unit correctness, null correctness and evidence failures. The initial experimental import gate requires valid schema and supported evidence on every test page, at least 90% numeric accuracy, and no regression against the small base model. This small assistant-reviewed test is insufficient for production approval; it does not compare against the dashboard's larger 8B model.
+
+`training/export_model.py` merges adapters into the exact cached base revision and imports a separate `greenworks-billreader-experimental:v2` model into local Ollama only if that gate passes. No model is uploaded. The dashboard lists installed models but preserves its existing selection/default. Failed evaluation keeps the adapter local for investigation.
+
+`scripts/finish_training.ps1 -TrainingProcessId <PID>` waits for an already-running training process, evaluates its saved adapter, attempts gated export, then resumes the full labeling queue. It runs the expensive stages sequentially. Follow-up errors are written to its log; labeling can still proceed. Keep the laptop awake and powered while these jobs run. The default paths target the v2 dataset/run and v1 automatic-label queue. Rerunning a finished evaluation does not repeat the held-out test.
+
+The active v2 training experiment uses 39 reviewed training examples for 39 optimizer steps; the three validation and three test pages are held out. The other source pages are queued for pseudo-labeling, not secretly treated as verified training data. Completion is recorded by `training-report.json`, `generation-evaluation.json`, and, only after successful import, `import-report.json`. A started process is not evidence that these stages completed.
+
 ### Completed laptop check (18 November 2026)
 
 `output/training/runs/bootstrap-v1/` contains a saved LoRA adapter and `training-report.json`. The offline CPU run completed four optimizer steps in 201.8 seconds using the original two training examples, one validation example and one untouched test example. It updated 540,672 adapter parameters. Validation response loss changed from 0.80722 to 0.78811; this single-example result is not extraction accuracy or evidence of generalization. The 45-page v2 dataset was prepared separately and has not yet been trained. All 33 software tests passed, and a separate numerical check confirmed that response-only loss matches standard masked causal loss with finite gradients. No adapter has been deployed to Ollama.
